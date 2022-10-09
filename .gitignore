@@ -1,0 +1,7 @@
+*.pth
+
+*.h5
+
+
+/lung_model
+/pneumothorax_model
