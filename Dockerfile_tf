@@ -1,0 +1,34 @@
+FROM python:3.6
+ENV http_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV https_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV ftp_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV no_proxy 127.0.0.1,localhost,*.hospitalitaliano.net,*.hospitalitaliano.org.ar
+
+# Installation of libraries
+RUN apt-get update && apt-get install -y \
+	wget \
+	vim \
+	bzip2 \
+	git \
+	alien \
+    libaio1 \
+    libaio-dev \
+    nano
+
+
+RUN apt-get install ffmpeg \
+    libsm6 \
+    libxext6  -y
+
+RUN pip install python-gdcm
+
+COPY requirements_tf.txt /requirements.txt
+RUN pip install --ignore-installed -r /requirements.txt
+RUN pip install tensorflow==1.14.0
+RUN pip install keras-retinanet==0.5.1
+RUN pip install keras==2.3.1
+RUN pip install h5py==2.10.0
+
+COPY decision_optimizer /decision_optimizer
+COPY lung_model /lung_model
+COPY main.py /main.py

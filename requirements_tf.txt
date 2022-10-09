@@ -1,0 +1,12 @@
+pandas
+numpy==1.16.4
+tqdm
+requests==2.23.0
+opencv-python
+Pillow==6.1
+scikit-image==0.14.2
+scikit-learn==0.24.2
+albumentations==0.4.3
+pydicom==1.4.2
+matplotlib
+seaborn

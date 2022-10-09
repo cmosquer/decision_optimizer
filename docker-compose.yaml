@@ -1,0 +1,15 @@
+version: "3.7"
+services:
+ decision_optimizer:
+  container_name: decision_optimizer
+  build:
+   context: .
+   dockerfile: Dockerfile_pytorch
+  environment:
+   - CREATE_PNEUMOTHORAX_MASKS=0
+   - CREATE_LUNG_MASKS_UNET=0
+   - CREATE_MASKS_PLOTS=0
+   - CREATE_JPGS=0
+  volumes:
+   - "/mnt/lxestudios/pacs/T-Rx/CANDID-PTX:/data"
+  command: ["python", "/main.py"]

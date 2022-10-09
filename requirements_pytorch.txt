@@ -1,0 +1,11 @@
+pandas
+numpy
+tqdm
+opencv-python
+Pillow
+scikit-image
+scikit-learn==1.0.1
+albumentations
+pydicom
+matplotlib
+seaborn

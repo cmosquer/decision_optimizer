@@ -1,0 +1,31 @@
+FROM python:3.7
+ENV http_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV https_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV ftp_proxy http://squid-ha.hospitalitaliano.net:3128
+ENV no_proxy 127.0.0.1,localhost,*.hospitalitaliano.net,*.hospitalitaliano.org.ar
+
+# Installation of libraries
+RUN apt-get update && apt-get install -y \
+	wget \
+	vim \
+	bzip2 \
+	git \
+	alien \
+    libaio1 \
+    libaio-dev \
+    nano
+
+
+RUN apt-get install ffmpeg \
+    libsm6 \
+    libxext6  -y
+    
+RUN pip install python-gdcm
+
+COPY requirements_pytorch.txt /requirements.txt
+RUN pip install --ignore-installed -r /requirements.txt
+RUN pip install torch torchvision
+
+COPY decision_optimizer /decision_optimizer
+COPY pneumothorax_model /pneumothorax_model
+COPY main.py /main.py
