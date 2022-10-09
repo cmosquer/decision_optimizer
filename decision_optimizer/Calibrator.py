@@ -95,12 +95,10 @@ class LogisticRegressionWCECalibrator(Calibrator):
         # For stability, posteriors cannot be exactly 1 or exactly 0
         posteriors_1 = np.argwhere(self.scores == 1.)[:, 0]
         if len(posteriors_1) > 0:
-            #print("corrected {} posteriors that where exactly 1 with epsilon {}".format(len(posteriors_1), epsilon))
             self.scores[posteriors_1] = self.scores[posteriors_1] - epsilon
 
         posteriors_0 = np.argwhere(self.scores == 0.)[:, 0]
         if len(posteriors_0) > 0:
-            #print("corrected {} posteriors that where exactly 0 with epsilon {}".format(len(posteriors_0), epsilon))
             self.scores[posteriors_0] = self.scores[posteriors_0] + epsilon
 
     def fit_algorithm(self):
