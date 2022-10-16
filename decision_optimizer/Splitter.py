@@ -18,17 +18,29 @@ class Splitter():
 
         self.current_ground_truth_df = ground_truth_df
         assert self.stratify_criteria in ground_truth_df.columns
-        assert self.split_level in ground_truth_df.columns
+        if self.split_level is not None:
+            assert self.split_level in ground_truth_df.columns
 
-        split_ids = sorted(list(set(ground_truth_df[self.split_level])))
+            split_ids = sorted(list(set(ground_truth_df[self.split_level])))
 
-        gt_ids = [ground_truth_df[ground_truth_df[self.split_level] == split_id][self.stratify_criteria].max() for split_id in split_ids] # si al menos una imagen del apciente tiene GT=1, se considera GT=1 para el stratify split
-        split_ids_train, split_ids_test = train_test_split(split_ids, test_size=1-train_size, stratify=gt_ids,
-                         random_state=self.random_state)
+            gt_ids = [ground_truth_df[ground_truth_df[self.split_level] == split_id][self.stratify_criteria].max() for split_id in split_ids] # si al menos una imagen del apciente tiene GT=1, se considera GT=1 para el stratify split
+            split_ids_train, split_ids_test = train_test_split(split_ids, test_size=1-train_size, stratify=gt_ids,
+                             random_state=self.random_state)
 
-        self.current_trainset_filenames = list(ground_truth_df[ground_truth_df[self.split_level].isin(split_ids_train)].index.values)
-        self.current_testset_filenames = list(ground_truth_df[ground_truth_df[self.split_level].isin(split_ids_test)].index.values)
-        self.current_ground_truth_df['split_assignation'] = ['train' if split_id in split_ids_train else 'test' for split_id in self.current_ground_truth_df[self.split_level]]
+            self.current_trainset_filenames = list(ground_truth_df[ground_truth_df[self.split_level].isin(split_ids_train)].index.values)
+            self.current_testset_filenames = list(ground_truth_df[ground_truth_df[self.split_level].isin(split_ids_test)].index.values)
+            self.current_ground_truth_df['split_assignation'] = ['train' if split_id in split_ids_train else 'test' for split_id in self.current_ground_truth_df[self.split_level]]
+        else:
+            gt_ids = ground_truth_df[self.stratify_criteria] # si al menos una imagen del apciente tiene GT=1, se considera GT=1 para el stratify split
+
+            split_ids_train, split_ids_test = train_test_split(self.current_ground_truth_df.index,
+                                                               test_size=1 - train_size, stratify=gt_ids,
+                                                               random_state=self.random_state)
+            self.current_trainset_filenames = list(split_ids_train)
+            self.current_testset_filenames = list(split_ids_test)
+            self.current_ground_truth_df['split_assignation'] = ['train' if split_id in split_ids_train else 'test' for
+                                                                 split_id in
+                                                                 self.current_ground_truth_df.index.values]
 
     def get_test_subset(self, pos_prior, label_column='GT', final_size=None, required_N_positives=None, 
                         ):

@@ -32,3 +32,4 @@ RUN pip install h5py==2.10.0
 COPY decision_optimizer /decision_optimizer
 COPY lung_model /lung_model
 COPY main.py /main.py
+COPY main_skin.py /main_skin.py

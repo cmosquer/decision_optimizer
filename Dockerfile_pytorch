@@ -29,3 +29,4 @@ RUN pip install torch torchvision
 COPY decision_optimizer /decision_optimizer
 COPY pneumothorax_model /pneumothorax_model
 COPY main.py /main.py
+COPY main_skin.py /main_skin.py

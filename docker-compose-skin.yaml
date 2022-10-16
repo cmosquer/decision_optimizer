@@ -1,0 +1,10 @@
+version: "3.7"
+services:
+ decision_optimizer_skin:
+  container_name: decision_optimizer
+  build:
+   context: .
+   dockerfile: Dockerfile_pytorch
+  volumes:
+   - "/mnt/lxestudios/pacs/Doctorado/decision_optimizer_results/FITZPATRICK:/data"
+  command: ["python", "/main_skin.py"]

@@ -10,11 +10,11 @@ class Evaluator():
 
     def __init__(self, test_labels, test_posteriors,
                  positive_prior=0.5, cost_FP=1, cost_FN=1):
-        self.posteriors = test_posteriors
+        self.positive_posteriors = test_posteriors
         self.correct_posteriors()
 
         self.labels = test_labels.astype(int)
-        self.LLR = logit(self.posteriors) - logit(positive_prior)
+        self.LLR = logit(self.positive_posteriors) - logit(positive_prior)
 
         self.real_positive_prior = np.sum(np.squeeze(self.labels)) / len(self.labels)
 
@@ -26,15 +26,15 @@ class Evaluator():
 
     def correct_posteriors(self, epsilon=1e-15):
         # For stability, posteriors cannot be exactly 1 or exactly 0
-        posteriors_1 = np.argwhere(self.posteriors == 1.)[:, 0]
+        posteriors_1 = np.argwhere(self.positive_posteriors == 1.)[:, 0]
         if len(posteriors_1) > 0:
             #print("corrected {} posteriors that where exactly 1 with epsilon {}".format(len(posteriors_1), epsilon))
-            self.posteriors[posteriors_1] = self.posteriors[posteriors_1] - epsilon
+            self.positive_posteriors[posteriors_1] = self.positive_posteriors[posteriors_1] - epsilon
 
-        posteriors_0 = np.argwhere(self.posteriors == 0.)[:, 0]
+        posteriors_0 = np.argwhere(self.positive_posteriors == 0.)[:, 0]
         if len(posteriors_0) > 0:
             #print("corrected {} posteriors that where exactly 0 with epsilon {}".format(len(posteriors_0), epsilon))
-            self.posteriors[posteriors_0] = self.posteriors[posteriors_0] + epsilon
+            self.positive_posteriors[posteriors_0] = self.positive_posteriors[posteriors_0] + epsilon
 
     def set_error_rates(self):
         fpr, tpr, threshold = roc_curve(self.labels, self.LLR)
@@ -55,15 +55,25 @@ class Evaluator():
                                        cost_false_positive * self.fpr * (1 - expected_test_prior)
 
     def get_unthresholded_metrics(self):
-        proper_scores = self.metrics_calculator.get_proper_scores()
+        brier, CE = self.metrics_calculator.get_proper_scores()
+        ECE_Naeini, MCE_Naeini, _, _, _ = self.metrics_calculator.get_calibration_errors_Naeini()
+        ECE_Guo, MCE_Guo, _, _, _ = self.metrics_calculator.get_calibration_errors_Guo()
+
+        ACE_Naeini = self.metrics_calculator.get_adaptive_calibration_error_Naeini()
+        ACE_Guo = self.metrics_calculator.get_adaptive_calibration_error_Guo()
         metrics_dict = {'AUCROC': self.metrics_calculator.get_AUCROC(),
                         'AUCPR': self.metrics_calculator.get_AUCPR(),
                         'adjusted_AUCPR': self.metrics_calculator.get_adjusted_AUCPR(),
                         'discrim_cost': self.metrics_calculator.get_DCFmin()[0],
                         'EER': self.metrics_calculator.get_EER()[0],
-                        'ECE_10bins': self.metrics_calculator.get_ECE()[0],
-                        'Brier': proper_scores[0],
-                        'CE': proper_scores[1]
+                        'ECE_Naeini': ECE_Naeini,
+                        'MCE_Naeini': MCE_Naeini,
+                        'ACE_Naeini': ACE_Naeini,
+                        'ECE_Guo': ECE_Guo,
+                        'MCE_Guo': MCE_Guo,
+                        'ACE_Guo': ACE_Guo,
+                        'Brier': brier,
+                        'CE': CE
                         }
         self.metrics.update(metrics_dict)
         return metrics_dict
