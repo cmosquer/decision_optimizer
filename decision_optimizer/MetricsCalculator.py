@@ -7,10 +7,21 @@ class MetricsCalculator():
     def __init__(self, evaluator):
         self.evaluator = evaluator
 
-    def get_proper_scores(self, stratify=True):
+    def get_proper_scores(self, balanced=False):
         brier = brier_score_loss(self.evaluator.labels, self.evaluator.positive_posteriors)
         CE = log_loss(self.evaluator.labels, self.evaluator.positive_posteriors)
-        #TODO stratify
+        if balanced:
+
+            brier = brier_score_loss(self.evaluator.labels[self.evaluator.labels == 1],
+                                     self.evaluator.positive_posteriors[self.evaluator.labels == 1], pos_label=1) + \
+                    brier_score_loss(self.evaluator.labels[self.evaluator.labels == 0],
+                                     self.evaluator.positive_posteriors[self.evaluator.labels == 0], pos_label=1)
+
+            CE = log_loss(self.evaluator.labels[self.evaluator.labels == 1],
+                                     self.evaluator.positive_posteriors[self.evaluator.labels == 1], labels=[0, 1]) + \
+                    log_loss(self.evaluator.labels[self.evaluator.labels == 0],
+                                     self.evaluator.positive_posteriors[self.evaluator.labels == 0], labels=[0, 1])
+
         return brier, CE
     def get_AUCROC(self):
         """
@@ -131,3 +142,9 @@ class MetricsCalculator():
                 mean_confidence_in_bin = confidences[in_bin].mean()
                 AdaEce += abs(accuracy_in_bin - mean_confidence_in_bin) * proportion_of_bin_samples
         return AdaEce
+
+    def get_accuracy(self, binarized_preds, balanced=False):
+        if balanced:
+            return balanced_accuracy_score(self.evaluator.labels, binarized_preds)
+        else:
+            return accuracy_score(self.evaluator.labels, binarized_preds)

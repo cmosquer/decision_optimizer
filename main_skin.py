@@ -16,7 +16,9 @@ def main():
     training_csvs ="/data/Runs_Validation/"
     tests_csvs = "/data/Runs_Test/"
     run_csvs = sorted(os.listdir(training_csvs))
-    output_dir = f"/data/calibration_results/"
+    output_dir = f"/data/CALIBRATION/"
+    os.makedirs(f'/{output_dir}/Runs_Test_with_calibration/', exist_ok=True)
+    os.makedirs(f'/{output_dir}/Runs_Validation_with_calibration/', exist_ok=True)
 
     # Configure scorers
     evaluated_score_columns = ['Malignancy']
@@ -41,19 +43,6 @@ def main():
             joined_df_test = pd.read_csv(tests_csvs + runcsv)
             joined_df_test.columns = ['id', 'GT', 'Malignancy', 'subset']
             joined_df_test.GT = joined_df_test.GT.astype(int)
-
-            parameters[run].update({
-                'train_set':
-                    {
-                        'N_images': len(joined_df_train),
-                        'N_images_positive': len(joined_df_train[joined_df_train[ground_truth_column] == 1])
-                    },
-                'test_set':
-                    {
-                        'N_images': len(joined_df_test),
-                        'N_images_positive': len(joined_df_test[joined_df_test[ground_truth_column] == 1])
-                    }
-            })
 
             # -----------Prepare predefined expected scenarios----------------------#
             predefined_scenarios = []
@@ -83,7 +72,7 @@ def main():
                             'LOG-REG': LogisticRegressionWCECalibrator()
                         }
 
-                        train_test_output_dir = f'/{output_dir}/validation/{runcsv.replace(".csv","/")}'
+                        train_test_output_dir = f'/{output_dir}/validation_plots/{runcsv.replace(".csv", "/")}'
                         os.makedirs(train_test_output_dir, exist_ok=True)
                         train_test_setting = TestSetting(joined_df_train,
                                                          evaluated_score_column,
@@ -97,8 +86,8 @@ def main():
                         else:
                             joined_df_test_subgroup = joined_df_test[joined_df_test.subset == subgroup]
                         print('Subgroup samples in test ', len(joined_df_test_subgroup))
-                        os.makedirs(f'/{output_dir}/test/{subgroup}/', exist_ok=True)
-                        test_output_dir = f'/{output_dir}/test/{subgroup}/{runcsv.replace(".csv","/")}'
+                        os.makedirs(f'/{output_dir}/test_plots/{subgroup}/', exist_ok=True)
+                        test_output_dir = f'/{output_dir}/test_plots/{subgroup}/{runcsv.replace(".csv", "/")}'
                         os.makedirs(test_output_dir, exist_ok=True)
                         test_setting = TestSetting(joined_df_test_subgroup,
                                                    evaluated_score_column,
@@ -124,15 +113,23 @@ def main():
                             test_setting.calibration_evaluation(calibrator_name, calibrator, get_posteriors_thresholds=True)
 
                         if subgroup == 'all':
-                            test_csv_dir = f'/{test_output_dir}/{runcsv}'
+                            test_csv_dir = f'/{output_dir}/Runs_Test_with_calibration/{runcsv}'
                             test_setting.df.to_csv(test_csv_dir)
+                            train_test_setting.results['N'] = [len(joined_df_train)] * len(train_test_setting.results)
+                            train_test_setting.results['N_positive'] = [len(
+                                joined_df_train[joined_df_train[ground_truth_column] == 1])] * len(
+                                train_test_setting.results)
+                            train_csv_dir = f'/{output_dir}/Runs_Validation_with_calibration/{runcsv}'
+                            train_test_setting.df.to_csv(train_csv_dir)
                             all_train_results = all_train_results.append(train_test_setting.results, ignore_index=True)
-                            train_test_setting.df.to_csv(f'/{train_test_output_dir}/{runcsv}')
+
                             parameters[run].update(test_setting.calibrators_parameters)
                         test_setting.results['subset'] = [subgroup]*len(test_setting.results)
+                        test_setting.results['N'] = [len(joined_df_test_subgroup)]*len(test_setting.results)
+                        test_setting.results['N_positive'] = [len(joined_df_test_subgroup[joined_df_test_subgroup[ground_truth_column] == 1])]*len(test_setting.results)
                         all_test_results = all_test_results.append(test_setting.results, ignore_index=True)
 
-            all_test_results['run'] = [runcsv.replace('.csv','')]*len(all_test_results)
+            all_test_results['run'] = [runcsv.replace('.csv', '')]*len(all_test_results)
             if os.path.exists(f'/{output_dir}/test_metrics.csv'):
                 existing_results = pd.read_csv(f'/{output_dir}/test_metrics.csv')
                 existing_results = existing_results.append(all_test_results)
@@ -163,7 +160,7 @@ def main():
                                                (all_test_results.calibrator == 'perfect_PAV') &
                                                (all_test_results.subset == subgroup)]
 
-                for metric in ['CE', 'Brier', 'predefined_cost']:
+                for metric in ['CE', 'Balanced_CE', 'Brier', 'Balanced_Brier', 'predefined_cost']:
                     perfect_metric = perfect_run[metric].values[0]
                     for method in ['no_calibration', 'LOG-REG']:
                         method_metric = all_test_results[(all_test_results.run == run) &
@@ -176,19 +173,27 @@ def main():
         all_test_results.to_csv(f'/{output_dir}/test_metrics.csv', index=False)
 
     if AGGREGATE_EXISTING_CSV:
-        all_test_results = pd.read_csv(f'/{output_dir}/test_metrics.csv')
-        metrics = ['AUCROC', 'AUCPR', 'adjusted_AUCPR', 'discrim_cost', 'EER',
-                    'ECE_Naeini', 'MCE_Naeini', 'ACE_Naeini',
-                    'ECE_Guo', 'MCE_Guo', 'ACE_Guo',
-                   'Brier', 'CE',
-                   'predefined_cost', 'predefined_precision', 'predefined_recall',
-                   'predefined_TPR', 'predefined_specificity', 'predefined_FPR',
-                   'predefined_FNR', 'predefined_calib_cost',
-                   'delta_CE', 'delta_Brier', 'delta_predefined_cost']
+        #Sort columns
+        for set in ['validation', 'test']:
+            all_results = pd.read_csv(f'/{output_dir}/{set}_metrics.csv')
+            metrics = ['AUCROC', 'AUCPR',
+                         'adjusted_AUCPR', 'EER',
+                         'ECE_Naeini', 'MCE_Naeini', 'ACE_Naeini', 'ECE_Guo', 'MCE_Guo', 'ACE_Guo',
+                         'Brier', 'delta_Brier', 'Balanced_Brier', 'delta_Balanced_Brier',
+                         'CE', 'delta_CE',  'Balanced_CE', 'delta_Balanced_CE',
+                         'predefined_precision', 'predefined_recall', 'predefined_specificity',
+                         'predefined_FPR', 'predefined_FNR',
+                        'predefined_cost', 'discrim_cost', 'delta_predefined_cost'
+                         ]
+            all_results = all_results[['run', 'subset', 'calibrator', 'N',
+                                        'N_positive', 'test_real_prior'] + metrics]
+            all_results.columns = [m.replace('predefined_', '') for m in all_results.columns]
+            all_results.to_csv(f'/{output_dir}/{set}_metrics.csv', index=False)
+            all_results.to_excel(f'/{output_dir}/{set}_metrics.xls', index=False)
 
         agg_dict = dict(zip(metrics, [['mean', 'std', 'median', 'min', 'max']] * len(metrics)))
         aggregated_results = pd.DataFrame()
-
+        all_test_results = pd.read_csv(f'/{output_dir}/test_metrics.csv')
         for method in ['no_calibration', 'LOG-REG']:
             for subgroup in evaluated_subgroups:
                 subdf = all_test_results[
@@ -226,5 +231,7 @@ def main():
                 ax.get_legend().remove()
             if j < len(plot_metrics)-1:
                 ax.set_xticklabels([])
+        fig.savefig(f'{output_dir}/metrics_plot.png', dpi=500)
+
 if __name__ == '__main__':
     main()

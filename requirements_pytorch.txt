@@ -9,3 +9,4 @@ albumentations
 pydicom
 matplotlib
 seaborn
+xlrd

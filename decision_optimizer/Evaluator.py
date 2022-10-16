@@ -56,6 +56,7 @@ class Evaluator():
 
     def get_unthresholded_metrics(self):
         brier, CE = self.metrics_calculator.get_proper_scores()
+        balanced_brier, balanced_CE = self.metrics_calculator.get_proper_scores(balanced=True)
         ECE_Naeini, MCE_Naeini, _, _, _ = self.metrics_calculator.get_calibration_errors_Naeini()
         ECE_Guo, MCE_Guo, _, _, _ = self.metrics_calculator.get_calibration_errors_Guo()
 
@@ -64,7 +65,6 @@ class Evaluator():
         metrics_dict = {'AUCROC': self.metrics_calculator.get_AUCROC(),
                         'AUCPR': self.metrics_calculator.get_AUCPR(),
                         'adjusted_AUCPR': self.metrics_calculator.get_adjusted_AUCPR(),
-                        'discrim_cost': self.metrics_calculator.get_DCFmin()[0],
                         'EER': self.metrics_calculator.get_EER()[0],
                         'ECE_Naeini': ECE_Naeini,
                         'MCE_Naeini': MCE_Naeini,
@@ -73,7 +73,10 @@ class Evaluator():
                         'MCE_Guo': MCE_Guo,
                         'ACE_Guo': ACE_Guo,
                         'Brier': brier,
-                        'CE': CE
+                        'Balanced_Brier': balanced_brier,
+                        'CE': CE,
+                        'Balanced_CE': balanced_CE,
+                        'discrim_cost': self.metrics_calculator.get_DCFmin()[0]
                         }
         self.metrics.update(metrics_dict)
         return metrics_dict
@@ -129,7 +132,10 @@ class Evaluator():
                         f'{self.current_threshold_name}_specificity': 1 - self.fpr[self.current_theta_idx_ROC],
                         f'{self.current_threshold_name}_FPR': self.fpr[self.current_theta_idx_ROC], #Pfa
                         f'{self.current_threshold_name}_FNR': 1-self.tpr[self.current_theta_idx_ROC], #Pmiss
-                        f'{self.current_threshold_name}_calib_cost': current_cost - self.metrics['discrim_cost']}
+                        f'{self.current_threshold_name}_calib_cost': current_cost - self.metrics['discrim_cost'],
+                        f'{self.current_threshold_name}_balanced_acc': self.metrics_calculator.get_accuracy(self.bin_preds_current_theta,
+                                                                                                            balanced=True)
+}
 
         self.metrics.update(metrics_dict)
         return metrics_dict
