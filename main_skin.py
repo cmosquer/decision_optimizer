@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 def main():
-    CALCULATE_METRICS = False
+    CALCULATE_METRICS = True
     AGGREGATE_EXISTING_CSV = True
     ground_truth_column = "GT"
     training_csvs ="/data/Runs_Validation/"
@@ -123,16 +123,14 @@ def main():
                             test_setting.set_current_expected_scenario(current_scenario)
                             test_setting.calibration_evaluation(calibrator_name, calibrator, get_posteriors_thresholds=True)
 
-                if subgroup == 'all':
-                    test_csv_dir = f'/{test_output_dir}/{runcsv}'
-                    test_setting.df.to_csv(test_csv_dir)
-                test_setting.results['subset'] = [subgroup]*len(test_setting.results)
-                all_test_results = all_test_results.append(test_setting.results, ignore_index=True)
-                all_train_results = all_train_results.append(train_test_setting.results, ignore_index=True)
-                parameters[run].update(test_setting.calibrators_parameters)
-
-                train_test_setting.df.to_csv(f'/{train_test_output_dir}/{runcsv}')
-
+                        if subgroup == 'all':
+                            test_csv_dir = f'/{test_output_dir}/{runcsv}'
+                            test_setting.df.to_csv(test_csv_dir)
+                            all_train_results = all_train_results.append(train_test_setting.results, ignore_index=True)
+                            train_test_setting.df.to_csv(f'/{train_test_output_dir}/{runcsv}')
+                            parameters[run].update(test_setting.calibrators_parameters)
+                        test_setting.results['subset'] = [subgroup]*len(test_setting.results)
+                        all_test_results = all_test_results.append(test_setting.results, ignore_index=True)
 
             all_test_results['run'] = [runcsv.replace('.csv','')]*len(all_test_results)
             if os.path.exists(f'/{output_dir}/test_metrics.csv'):
@@ -158,16 +156,23 @@ def main():
 
         #Calculate deltas with perfect calibrated version
         all_test_results = pd.read_csv(f'/{output_dir}/test_metrics.csv')
-        for run in all_test_results.run.values:
-            for subgroup in evaluated_subgroups:
-                perfect_run = all_test_results[(all_test_results.run == run) & (all_test_results.calibrator == 'perfect_PAV') & (all_test_results.subset == subgroup)]
+        for run in all_test_results.run.unique():
+            print(run)
+            for subgroup in all_test_results.subset.unique():
+                perfect_run = all_test_results[(all_test_results.run == run) &
+                                               (all_test_results.calibrator == 'perfect_PAV') &
+                                               (all_test_results.subset == subgroup)]
+
                 for metric in ['CE', 'Brier', 'predefined_cost']:
+                    perfect_metric = perfect_run[metric].values[0]
                     for method in ['no_calibration', 'LOG-REG']:
-                        method_metric = \
-                        all_test_results[(all_test_results.run == run) & (all_test_results.calibrator == method)  & (all_test_results.subset == subgroup)][metric]
-                        all_test_results.at[(all_test_results['run'] == run) & (
-                                    all_test_results.calibrator == method)  & (all_test_results.subset == subgroup), 'delta_' + metric] = method_metric - perfect_run[
-                            metric]
+                        method_metric = all_test_results[(all_test_results.run == run) &
+                                                         (all_test_results.calibrator == method) &
+                                                         (all_test_results.subset == subgroup)][metric].values[0]
+                        all_test_results.at[(all_test_results['run'] == run) &
+                                            (all_test_results.calibrator == method) &
+                                            (all_test_results.subset == subgroup),
+                                            'delta_' + metric] = method_metric - perfect_metric
         all_test_results.to_csv(f'/{output_dir}/test_metrics.csv', index=False)
 
     if AGGREGATE_EXISTING_CSV:
@@ -186,15 +191,40 @@ def main():
 
         for method in ['no_calibration', 'LOG-REG']:
             for subgroup in evaluated_subgroups:
-                subdf = all_test_results[(all_test_results.calibrator==method)&(all_test_results.subset == subgroup)]
-                assert len(subdf) == 25
+                subdf = all_test_results[
+                    (all_test_results.calibrator == method) & (all_test_results.subset == subgroup)]
+                assert len(subdf) == len(run_csvs)
                 agg_subdf = subdf.agg(agg_dict)
                 agg_subdf['method'] = [method] * len(agg_subdf)
                 agg_subdf['subset'] = [subgroup] * len(agg_subdf)
-                agg_subdf = agg_subdf[['subset', 'method']+metrics]
+                agg_subdf['statistic'] = agg_subdf.index
+                agg_subdf = agg_subdf[['method', 'subset', 'statistic'] + metrics]
                 agg_subdf.columns = [m.replace('predefined_', '') for m in agg_subdf.columns]
-                aggregated_results = aggregated_results.append(agg_subdf)
-        aggregated_results.to_csv(f'/{output_dir}/aggregated_test_metrics.csv')
+                aggregated_results = aggregated_results.append(agg_subdf, ignore_index=True)
+        aggregated_results.to_csv(f'/{output_dir}/aggregated_test_metrics.csv', index=False)
 
+        plot_metrics = ['AUCROC', 'AUCPR', 'adjusted_AUCPR',
+                   'ECE_Naeini', 'MCE_Naeini', 'ACE_Naeini',
+                   'ECE_Guo', 'MCE_Guo', 'ACE_Guo',
+                   'precision', 'recall', 'specificity',
+                   'cost', 'discrim_cost', 'delta_cost',
+                   'CE', 'delta_CE', 'Brier', 'delta_Brier']
+        fig, axs = plt.subplots(7, 3, figsize=(12, 24))
+        fig.tight_layout()
+
+        for j, metric in enumerate(plot_metrics):
+            ax = axs[j // 3][j % 3]
+            sns.boxplot(x="calibrator", y=metric,
+                        hue="subset", palette=["m", "g", "b"],
+                        data=test_metrics[test_metrics.calibrator.isin(['no_calibration', 'LOG-REG'])],
+                        ax=ax)
+            ax.set_title(metric)
+            ax.set_xlabel('')
+            ax.set_ylabel('')
+            sns.despine(offset=10, trim=True)
+            if j > 0:
+                ax.get_legend().remove()
+            if j < len(plot_metrics)-1:
+                ax.set_xticklabels([])
 if __name__ == '__main__':
     main()

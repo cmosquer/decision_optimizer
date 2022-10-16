@@ -13,6 +13,7 @@ class Plotter():
         self.axs_dict['fig'].savefig(path, dpi=500)
         if save_editable:
             self.axs_dict['fig'].savefig(path[:-4]+'.svg')
+        plt.close(self.axs_dict['fig'])
 
     def add_evaluator(self, evaluator, color, evaluation_name):
         assert isinstance(evaluator, Evaluator)

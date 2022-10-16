@@ -102,7 +102,6 @@ class MetricsCalculator():
             # Calculates |fraction of positives - mean positive posterior| in each bin
             in_bin = [True if (bin_lower <= x < bin_upper) else False for x in self.evaluator.positive_posteriors]  # revisar qué pasa con extremos código original
             proportion_of_bin_samples = in_bin.count(True) / len(in_bin)
-            print('bin N samples', in_bin.count(True))
             if (proportion_of_bin_samples) > 0:
                 positive_fraction_in_bin = self.evaluator.labels[in_bin].sum() / in_bin.count(True)
                 mean_predicted_score_in_bin = self.evaluator.positive_posteriors[in_bin].mean()
