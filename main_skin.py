@@ -7,22 +7,25 @@ import os, json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+import seaborn as sns
 
 def main():
     CALCULATE_METRICS = True
     AGGREGATE_EXISTING_CSV = True
     ground_truth_column = "GT"
     training_csvs ="/data/Runs_Validation/"
-    tests_csvs = "/data/Runs_Test/"
+    #tests_csvs = "/data/Runs_Test/"
     run_csvs = sorted(os.listdir(training_csvs))
-    output_dir = f"/data/CALIBRATION/"
-    os.makedirs(f'/{output_dir}/Runs_Test_with_calibration/', exist_ok=True)
-    os.makedirs(f'/{output_dir}/Runs_Validation_with_calibration/', exist_ok=True)
+    #output_dir = f"/data/CALIBRATION/"
+
 
     # Configure scorers
     evaluated_score_columns = ['Malignancy']
     evaluated_subgroups = ['all', 'light', 'dark']
+    tests_csvs = "/data/Subsampled_Test_Runs/"
+    output_dir = f"/data/EQUAL_N_LIGHT_DARK/"
+    os.makedirs(f'/{output_dir}/Runs_Test_with_calibration/', exist_ok=True)
+    os.makedirs(f'/{output_dir}/Runs_Validation_with_calibration/', exist_ok=True)
 
     if CALCULATE_METRICS:
         # --- Configure test settings & expected scenarios ----#
@@ -37,11 +40,14 @@ def main():
             parameters[run] = {}
             print(runcsv)
             joined_df_train = pd.read_csv(training_csvs + runcsv)
+            print(joined_df_train.columns)
             joined_df_train.columns = ['GT', 'Malignancy', 'subset']
             joined_df_train.GT = joined_df_train.GT.astype(int)
 
-            joined_df_test = pd.read_csv(tests_csvs + runcsv)
-            joined_df_test.columns = ['id', 'GT', 'Malignancy', 'subset']
+            joined_df_test = pd.read_csv(tests_csvs + runcsv)[['Malignancy_gt', 'Malignancy', 'subset']]
+            print(joined_df_test.columns)
+
+            joined_df_test.columns = ['GT', 'Malignancy', 'subset']
             joined_df_test.GT = joined_df_test.GT.astype(int)
 
             # -----------Prepare predefined expected scenarios----------------------#
@@ -176,21 +182,25 @@ def main():
         #Sort columns
         for set in ['validation', 'test']:
             all_results = pd.read_csv(f'/{output_dir}/{set}_metrics.csv')
-            metrics = ['AUCROC', 'AUCPR',
+            print(all_results.columns)
+            metrics = [m for m in ['AUCROC', 'AUCPR',
                          'adjusted_AUCPR', 'EER',
                          'ECE_Naeini', 'MCE_Naeini', 'ACE_Naeini', 'ECE_Guo', 'MCE_Guo', 'ACE_Guo',
                          'Brier', 'delta_Brier', 'Balanced_Brier', 'delta_Balanced_Brier',
                          'CE', 'delta_CE',  'Balanced_CE', 'delta_Balanced_CE',
                          'predefined_precision', 'predefined_recall', 'predefined_specificity',
-                         'predefined_FPR', 'predefined_FNR',
+                         'predefined_FPR', 'predefined_FNR', 'predefined_balanced_acc',
                         'predefined_cost', 'discrim_cost', 'delta_predefined_cost'
-                         ]
-            all_results = all_results[['run', 'subset', 'calibrator', 'N',
-                                        'N_positive', 'test_real_prior'] + metrics]
+                         ] if m in all_results.columns]
+            print(metrics)
+            info = [c for c in ['run', 'subset', 'calibrator', 'N',
+                                        'N_positive', 'test_real_prior'] if c in all_results.columns]
+            all_results = all_results[info + metrics]
             all_results.columns = [m.replace('predefined_', '') for m in all_results.columns]
             all_results.to_csv(f'/{output_dir}/{set}_metrics.csv', index=False)
             all_results.to_excel(f'/{output_dir}/{set}_metrics.xls', index=False)
 
+        metrics = [m.replace('predefined_','') for m in metrics]
         agg_dict = dict(zip(metrics, [['mean', 'std', 'median', 'min', 'max']] * len(metrics)))
         aggregated_results = pd.DataFrame()
         all_test_results = pd.read_csv(f'/{output_dir}/test_metrics.csv')
@@ -207,13 +217,14 @@ def main():
                 agg_subdf.columns = [m.replace('predefined_', '') for m in agg_subdf.columns]
                 aggregated_results = aggregated_results.append(agg_subdf, ignore_index=True)
         aggregated_results.to_csv(f'/{output_dir}/aggregated_test_metrics.csv', index=False)
-
-        plot_metrics = ['AUCROC', 'AUCPR', 'adjusted_AUCPR',
+        aggregated_results.to_excel(f'/{output_dir}/aggregated_test_metrics.xls', index=False)
+        plot_metrics = [m for m in ['AUCROC', 'AUCPR', 'adjusted_AUCPR',
                    'ECE_Naeini', 'MCE_Naeini', 'ACE_Naeini',
                    'ECE_Guo', 'MCE_Guo', 'ACE_Guo',
                    'precision', 'recall', 'specificity',
                    'cost', 'discrim_cost', 'delta_cost',
-                   'CE', 'delta_CE', 'Brier', 'delta_Brier']
+                   'CE', 'delta_CE', 'balanced_acc',
+                   'Brier', 'delta_Brier'] if m in all_test_results.columns]
         fig, axs = plt.subplots(7, 3, figsize=(12, 24))
         fig.tight_layout()
 
@@ -221,7 +232,7 @@ def main():
             ax = axs[j // 3][j % 3]
             sns.boxplot(x="calibrator", y=metric,
                         hue="subset", palette=["m", "g", "b"],
-                        data=test_metrics[test_metrics.calibrator.isin(['no_calibration', 'LOG-REG'])],
+                        data=all_test_results[all_test_results.calibrator.isin(['no_calibration', 'LOG-REG'])],
                         ax=ax)
             ax.set_title(metric)
             ax.set_xlabel('')

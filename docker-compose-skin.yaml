@@ -6,5 +6,5 @@ services:
    context: .
    dockerfile: Dockerfile_pytorch
   volumes:
-   - "/mnt/lxestudios/pacs/Doctorado/decision_optimizer_results/PADUFES_Reduced:/data"
+   - "/mnt/lxestudios/pacs/Doctorado/decision_optimizer_results/FITZPATRICK:/data"
   command: ["python", "/main_skin.py"]
